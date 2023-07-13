@@ -1,0 +1,11 @@
+# macOS
+*.DS_Store
+
+# Env
+.env
+
+# Node
+node_modules/
+
+# App
+last_updated_time.txt
