@@ -29,6 +29,10 @@ async function extractProperty (property) {
     case 'number':
       return property.number
 
+    // Status
+    case 'status':
+      return property.status?.name
+
     // Title
     case 'title':
       const title = property.title[0]
@@ -47,6 +51,10 @@ async function extractProperty (property) {
 
     case 'multi_select':
       return property.multi_select.map(select => select?.name).join(', ')
+
+    // Date
+    case 'last_edited_time':
+      return property.last_edited_time
 
     // Relation
     case 'relation':
