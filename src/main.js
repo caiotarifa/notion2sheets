@@ -5,15 +5,16 @@ require('dotenv').config()
 const { getNotionDatabase } = require('./apps/notion.js')
 const { updateGoogleSheet } = require('./apps/google-sheets.js')
 
-const FILE_PATH = 'last_updated_time.txt'
+const FILE_PATH = 'last_updated_time.json'
 
 const time = {
-  current: new Date().toISOString(),
+  current: {},
   lastUpdated: null
 }
 
 try {
-  time.lastUpdated = fs.readFileSync(FILE_PATH, 'utf-8')
+  const body = fs.readFileSync(FILE_PATH, 'utf-8')
+  time.lastUpdated = JSON.parse(body)
 } catch (error) {
   time.lastUpdated = null
 }
@@ -26,7 +27,7 @@ const collections = [
   }
 ]
 
-async function main() {
+async function main () {
   for (const key in collections) {
     const {
       notionDatabaseId,
@@ -34,32 +35,40 @@ async function main() {
       googleSheetName
     } = collections[key]
 
-    console.log(`===| COLLECTION ${key} |===`)
-    console.log(`Fetching data from Notion database (${notionDatabaseId})...`)
+    console.log(`===| COLLECTION | ${googleSheetName.toUpperCase()} |===`)
+    console.log(`🕐 Fetching data from Notion database (${notionDatabaseId})...`)
+
+    const lastUpdated = time.lastUpdated ? time.lastUpdated[notionDatabaseId] : null
 
     const data = await getNotionDatabase(
       notionDatabaseId,
-      time.lastUpdated ? {
+      lastUpdated ? {
         timestamp: 'last_edited_time',
-        last_edited_time: { on_or_after: time.lastUpdated }
+        last_edited_time: { on_or_after: lastUpdated }
       } : null
     )
   
-    console.log(`Data fetched successfully! (${data.length} rows)`)
+    console.log(`🎲 Data fetched successfully! (${data.length} rows)`)
+
+    time.current[notionDatabaseId] = new Date().toISOString()
+
+    const body = JSON.stringify(time.current)
+    fs.writeFileSync(FILE_PATH, body, 'utf-8')
 
     if (!data.length) {
-      console.log('Nothing to update.')
+      console.log('🟢 Nothing to update.\n')
       continue
     }
 
-    console.log(`Updating "${googleSheetName}" tab in Google Sheet (${googleSheetId})...`)
+    console.log(`🕐 Updating "${googleSheetName}" tab in Google Sheet (${googleSheetId})...`)
 
-    await updateGoogleSheet(googleSheetId, googleSheetName, data)
-  
-    console.log('Sheet updated successfully!')
+    try {
+      await updateGoogleSheet(googleSheetId, googleSheetName, data)
+      console.log('🟢 Sheet updated successfully!\n')
+    } catch (error) {
+      console.error('🔴 Error updating Google Sheet.\n', error)
+    }
   }
-
-  fs.writeFileSync(FILE_PATH, time.current, 'utf-8')
 }
 
 main().catch(console.error)
