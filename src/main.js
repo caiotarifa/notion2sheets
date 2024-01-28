@@ -1,31 +1,29 @@
 const fs = require('fs')
+const TOML = require('toml')
 
 require('dotenv').config()
 
 const { getNotionDatabase } = require('./apps/notion.js')
 const { updateGoogleSheet } = require('./apps/google-sheets.js')
 
-const FILE_PATH = 'last_updated_time.json'
+const {
+  COLLECTIONS_PATH = 'collections.toml',
+  LAST_UPDATED_PATH = 'last_updated.json'
+} = process.env
 
-const time = {
-  current: {},
-  lastUpdated: null
-}
+const time = { lastUpdated: null }
+
+const { collections } = TOML.parse(
+  fs.readFileSync(COLLECTIONS_PATH, 'utf-8')
+)
 
 try {
-  const body = fs.readFileSync(FILE_PATH, 'utf-8')
-  time.lastUpdated = JSON.parse(body)
+  time.lastUpdated = JSON.parse(
+    fs.readFileSync(LAST_UPDATED_PATH, 'utf-8')
+  )
 } catch (error) {
   time.lastUpdated = null
 }
-
-const collections = [
-  {
-    notionDatabaseId: 'your-notion-database-id',
-    googleSheetId: 'your-google-sheet-id',
-    googleSheetName: 'your-google-sheet-name'
-  }
-]
 
 async function main () {
   for (const key in collections) {
@@ -42,18 +40,20 @@ async function main () {
 
     const data = await getNotionDatabase(
       notionDatabaseId,
-      lastUpdated ? {
-        timestamp: 'last_edited_time',
-        last_edited_time: { on_or_after: lastUpdated }
-      } : null
+      lastUpdated
+        ? {
+            timestamp: 'last_edited_time',
+            last_edited_time: { on_or_after: lastUpdated }
+          }
+        : null
     )
-  
+
     console.log(`🎲 Data fetched successfully! (${data.length} rows)`)
 
-    time.current[notionDatabaseId] = new Date().toISOString()
+    time.lastUpdated[notionDatabaseId] = new Date().toISOString()
 
-    const body = JSON.stringify(time.current)
-    fs.writeFileSync(FILE_PATH, body, 'utf-8')
+    const body = JSON.stringify(time.lastUpdated)
+    fs.writeFileSync(LAST_UPDATED_PATH, body, 'utf-8')
 
     if (!data.length) {
       console.log('🟢 Nothing to update.\n')

@@ -3,9 +3,10 @@
 
 # Env
 .env
+collections.toml
 
 # Node
 node_modules/
 
 # App
-last_updated_time.json
+last_updated.json

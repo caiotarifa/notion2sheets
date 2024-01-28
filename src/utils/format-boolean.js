@@ -18,5 +18,5 @@ module.exports = function (boolean) {
     return String(boolean)
   }
 
-  return booleanLocalization[locale][value]
+  return booleanLocalization[locale][boolean]
 }

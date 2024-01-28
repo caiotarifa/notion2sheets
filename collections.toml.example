@@ -1,0 +1,4 @@
+[[collections]]
+notionDatabaseId = "your-notion-database-id"
+googleSheetId = "your-google-sheet-id"
+googleSheetName = "your-google-sheet-name"

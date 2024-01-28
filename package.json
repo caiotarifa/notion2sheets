@@ -1,17 +1,24 @@
 {
   "name": "notion2sheets",
-  "version": "1.0.1",
-  "description": "",
+  "version": "1.1.0",
+  "description": "Fetch data from a Notion database and update or append the data to a Google Sheets document.",
   "main": "src/main.js",
   "scripts": {
+    "start": "node src/main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Caio Tarifa",
   "license": "MIT",
   "dependencies": {
     "@notionhq/client": "^2.2.14",
     "bottleneck": "^2.19.5",
-    "dotenv": "^16.3.1",
-    "googleapis": "^131.0.0"
+    "dotenv": "^16.4.1",
+    "googleapis": "^131.0.0",
+    "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-standard": "^17.1.0",
+    "standard": "^17.1.0"
   }
 }

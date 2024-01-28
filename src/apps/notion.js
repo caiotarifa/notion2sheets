@@ -19,6 +19,8 @@ function cacheUser (user) {
   if (user && !userCache[user.id]) {
     userCache[user.id] = user
   }
+
+  return user
 }
 
 async function getPage (pageId) {
@@ -49,36 +51,31 @@ async function getUser (userId) {
 async function extractProperty (property) {
   // https://developers.notion.com/reference/property-object
   // https://developers.notion.com/reference/page-property-values
-  switch (property.type) {
+
+  const types = {
     // Checkbox
-    case 'checkbox':
-      return formatBoolean(property.checkbox)
+    checkbox: property => formatBoolean(property.checkbox),
 
     // Created By
-    case 'created_by':
-      const { created_by: createdBy } = property
-
-      cacheUser(createdBy)
-      return createdBy.name ?? ''
+    created_by: property => cacheUser(property.created_by).name ?? '',
 
     // Created Time
-    case 'created_time':
-      return formatDate(property.created_time ?? '')
+    created_time: property => formatDate(property.created_time ?? ''),
 
     // Date
-    case 'date':
+    date: property => {
       const { start, end } = property.date || {}
       return [formatDate(start), formatDate(end)].filter(Boolean).join(' - ')
+    },
 
     // Email
-    case 'email':
-      return property.email
+    email: (property) => property.email,
 
     // Files
     // TODO: Implement files
 
     // Formula
-    case 'formula':
+    formula: property => {
       const { formula } = property
 
       switch (formula.type) {
@@ -94,50 +91,34 @@ async function extractProperty (property) {
         default:
           return formula[formula.type]
       }
+    },
 
     // Last Edited Time
-    case 'last_edited_time':
-      return formatDate(property.last_edited_time)
-    
-    // Last Edited By
-    case 'last_edited_by':
-      const { last_edited_by: lastEditedBy } = property
+    last_edited_time: property => formatDate(property.last_edited_time),
 
-      cacheUser(lastEditedBy)
-      return lastEditedBy.name ?? ''
-    
+    // Last Edited By
+    last_edited_by: property => cacheUser(property.last_edited_by).name ?? '',
+
     // Multi Select
-    case 'multi_select':
-      return property.multi_select.map(select => select?.name).join('\n')
+    multi_select: property => property.multi_select.map(
+      select => select?.name
+    ).join('\n'),
 
     // Number
-    case 'number':
-      return formatNumber(property.number)
-
-    // People
-    case 'people':
-      const people = []
-
-      for (const person of property.people) {
-        cacheUser(person)
-        people.push(person.name)
-      }
-
-      return people.join('\n')
+    number: property => formatNumber(property.number),
 
     // Phone Number
-    case 'phone_number':
-      return property.phone_number
+    phone_number: property => property.phone_number,
 
     // Relation
-    case 'relation':
+    relation: async property => {
       if (property.relation.length) {
         const relations = []
 
         for (const relation of property.relation) {
           // TODO: Implement has_more
           const { properties } = await getPage(relation.id)
-    
+
           for (const key in properties) {
             if (properties[key].type === 'title') {
               const title = await extractProperty(properties[key])
@@ -146,21 +127,21 @@ async function extractProperty (property) {
             }
           }
         }
-    
+
         return relations.join('\n')
       }
-
-      return ''
+    },
 
     // Rich Text
-    case 'rich_text':
-      return property.rich_text.map(text => text.plain_text).join('\n')
+    rich_text: property => property.rich_text.map(
+      text => text.plain_text
+    ).join('\n'),
 
     // Rollup
-    case 'rollup':
+    rollup: async property => {
       // TODO: Implement rollup functions and others types
       const { rollup } = property
-      
+
       if (rollup.type === 'array') {
         const rollups = []
 
@@ -172,33 +153,37 @@ async function extractProperty (property) {
       }
 
       return (await extractProperty(rollup))
+    },
 
-    // Selects
-    case 'select':
-      return property.select?.name || ''
+    // Select
+    select: property => property.select?.name || '',
 
     // Status
-    case 'status':
-      return property.status?.name || ''
+    status: property => property.status?.name || '',
 
     // Title
-    case 'title':
+    title: property => {
       const title = property.title[0]
       return title?.text?.content || title?.plain_text || ''
+    },
 
     // Unique ID
-    case 'unique_id':
+    unique_id: property => {
       const { prefix, number } = property.unique_id
       return [prefix, number].filter(Boolean).join('-')
+    },
 
     // URL
-    case 'url':
-      return property.url
-
-    // Other
-    default:
-      return ''
+    url: property => property.url
   }
+
+  const type = property.type
+
+  if (types[type]) {
+    return types[type](property)
+  }
+
+  return ''
 }
 
 async function getNotionDatabase (databaseId, filter) {
@@ -215,21 +200,13 @@ async function getNotionDatabase (databaseId, filter) {
       filter: filter || undefined
     }))
 
-    if (process.env.DEBUG) {
+    if (/true/i.test(process.env.DEBUG)) {
       console.log('\n----------------------------------------\n')
       console.log(util.inspect(response, false, null, true))
     }
 
     for (const page of response.results) {
-      const {
-        id,
-        created_by,
-        created_time,
-        last_edited_by,
-        last_edited_time,
-        properties,
-        url
-      } = page
+      const { id, properties, url } = page
 
       const object = { id }
 
@@ -237,16 +214,16 @@ async function getNotionDatabase (databaseId, filter) {
         object[key] = await extractProperty(properties[key])
       }
 
-      const createdBy = await getUser(created_by.id)
-      const lastEditedBy = await getUser(last_edited_by.id)
+      const createdBy = await getUser(page.created_by.id)
+      const lastEditedBy = await getUser(page.last_edited_by.id)
 
       object['Created By'] = createdBy.name
-      object['Created At'] = formatDate(created_time)
+      object['Created At'] = formatDate(page.created_time)
 
       object['Last Edited By'] = lastEditedBy.name
-      object['Last Edited At'] = formatDate(last_edited_time)
+      object['Last Edited At'] = formatDate(page.last_edited_time)
 
-      object['URL'] = url
+      object.URL = url
 
       loop.results.push(object)
     }
